@@ -1,3 +1,4 @@
+import scala.collection.mutable
 import scala.io.Source
 
 /**
@@ -26,3 +27,19 @@ val valid = input.filter(validTriangle).length
 println(s"total = ${input.length}")
 println(s"valid = $valid")
 
+val input2 = Source.fromFile("input.txt").getLines
+
+val out = new mutable.MutableList[Seq[Int]]()
+
+while (input2.hasNext) {
+  val s1 = lineToSeq(input2.next)
+  val s2 = lineToSeq(input2.next)
+  val s3 = lineToSeq(input2.next)
+  println(s"1: $s1")
+  println(s"2: $s2")
+  println(s"3: $s3")
+  println()
+  out += Seq(s1(0), s2(0), s3(0))
+}
+
+println(out)
