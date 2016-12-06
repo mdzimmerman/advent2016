@@ -10,14 +10,23 @@ import scala.annotation.tailrec
 
 val m = MessageDigest.getInstance("MD5")
 
-def md5Zeros(s: String): Option[Char] = {
+case class PasswordChar(c1: Char, c2: Char)
+
+def md5Zeros(s: String): Option[PasswordChar] = {
   m.reset()
   m.update(s.getBytes())
   val digest = m.digest()
   val bigInt = new BigInteger(1, digest)
   val hashText = bigInt.toString(16)
   val nZeros = 32 - hashText.length
-  if (nZeros > 5) Some('0') else if (nZeros == 5) Some(hashText.charAt(0)) else None
+  if (nZeros < 5)
+    None
+  else if (nZeros == 5)
+    Some(PasswordChar(hashText.charAt(0), hashText.charAt(1)))
+  else if (nZeros == 6)
+    Some(PasswordChar('0', hashText.charAt(0)))
+  else // nZeros >= 7
+    Some(PasswordChar('0', '0'))
 }
 
 @tailrec
@@ -28,7 +37,7 @@ def calcPassword(prefix: String, i: Int, password: List[Char]): List[Char] = {
     val passwordNew: List[Char] = md5Zeros(prefix + i.toString) match {
       case Some(p) => {
         println(s"prefix=$prefix i=$i char=$p")
-        password ::: List(p)
+        password ::: List(p.c1)
       }
       case None => password
     }
