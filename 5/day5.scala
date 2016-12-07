@@ -45,6 +45,32 @@ def calcPassword(prefix: String, i: Int, password: List[Char]): List[Char] = {
   }
 }
 
+def calcPasswordNew(prefix: String): String = {
+  val password = new Array[Option[Char]](8)
+  for (i <- 0 until 8) password(i) = None
+
+  var i = 0L
+
+  while (password.flatten.length < 8) {
+    md5Zeros(prefix + i.toString) match {
+      case Some(p) => {
+        //println(s"prefix=$prefix i=$i c1=${p.c1} c2=${p.c2}")
+        val pos = p.c1 - '0'
+        if (pos < 8 && password(pos) == None) {
+          password(pos) = Some(p.c2)
+          println(password.map {
+            case Some(p) => p
+            case None => '_'
+          }.mkString(""))
+        }
+      }
+      case None =>
+    }
+    i += 1
+  }
+  password.flatten.mkString("")
+}
+
 val test = List(
   "abc",
   "abc3231929",
@@ -52,9 +78,12 @@ val test = List(
   "abc5278568"
 )
 
-test.foreach(s => {
+/*test.foreach(s => {
   println(s"$s => ${md5Zeros(s)}")
-})
+})*/
 
 println(calcPassword("abc", 0, List()).mkString(""))
 println(calcPassword("reyedfim", 0, List()).mkString(""))
+
+println(calcPasswordNew("abc"))
+println(calcPasswordNew("reyedfim"))
