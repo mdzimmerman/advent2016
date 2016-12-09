@@ -1,4 +1,5 @@
 import scala.annotation.tailrec
+import scala.io.Source
 
 /**
   * Created by mzimmerman on 12/9/16.
@@ -50,5 +51,8 @@ test.foreach(in => {
   val out = process(in)
   println(s"$in => $out [${out.length}]")
 })
-//println(process("ADVENT"))
-//println(process("A(1x5)BC"))
+
+val input = Source.fromFile("input.txt").getLines().mkString("")
+val out = process(input)
+println(s"compressed   = ${input.length}")
+println(s"uncompressed = ${out.length}")
