@@ -4,64 +4,12 @@ import scala.io.Source
 /**
   * Created by mzimmerman on 12/9/16.
   */
-
-case class IPv7(ext: List[String] = List(), int: List[String] = List()) {
-  def appendExt(s: String): IPv7 = {
-    if (s.isEmpty)
-      this.copy()
-    else
-      new IPv7(ext ::: List(s), int)
-
-  }
-
-  def appendInt(s: String): IPv7 = {
-    if (s.isEmpty)
-      this.copy()
-    else
-      new IPv7(ext, int ::: List(s))
-  }
-
-  private def isABBA(s: String): Boolean =
-    s.sliding(4).map(sub => {
-      val c = sub.toSeq
-      c.length >= 4 && c(0) == c(3) && c(1) == c(2) && c(0) != c(1)
-    }).exists(x => x)
-
-  private def isExtABBA(): Boolean = ext.map(isABBA).exists(x => x)
-
-  private def isIntABBA(): Boolean = int.map(isABBA).exists(x => x)
-
-  def isTLS(): Boolean = isExtABBA && !isIntABBA
-
-  private def getABA(s: String): List[String] =
-  s.sliding(3).filter(ss => {
-    val c = ss.toSeq
-    c(0) == c(2) && c(0) != c(1)
-  }).toList
-
-  private def matchingABA(s1: String, s2: String): Boolean = {
-    val c1 = s1.toSeq
-    val c2 = s2.toSeq
-    c1.length == 3 && c2.length == 3 &&
-      c1(0) == c1(2) && c1(0) == c2(1) &&
-      c2(0) == c2(2) && c2(0) == c1(1)
-  }
-
-  def isSSL(): Boolean = {
-    val extABA = ext.flatMap(getABA)
-    val intABA = int.flatMap(getABA)
-    (for (e <- extABA; i <- intABA) yield matchingABA(e, i)).exists(x => x)
-  }
-}
-
 object IPv7 {
   sealed trait State
   case object InExt extends State
   case object InInt extends State
 
-  val bracketed = """\[(.+)\].*""".r
-
-  def parse(s: String): IPv7 = parse(s, new IPv7(), InExt, "")
+  def parse(s: String): IPv7 = parse(s, IPv7(), InExt, "")
 
   @tailrec
   def parse(s: String, ip: IPv7, state: State, buffer: String): IPv7 = {
@@ -84,6 +32,54 @@ object IPv7 {
   }
 }
 
+case class IPv7(ext: List[String] = List(), int: List[String] = List()) {
+  def appendExt(s: String): IPv7 = {
+    if (s.isEmpty)
+      this.copy()
+    else
+      IPv7(ext ::: List(s), int)
+
+  }
+
+  def appendInt(s: String): IPv7 = {
+    if (s.isEmpty)
+      this.copy()
+    else
+      IPv7(ext, int ::: List(s))
+  }
+
+  private def isABBA(s: String): Boolean =
+    s.sliding(4).map(sub => {
+      val c = sub.toSeq
+      c.length >= 4 && c(0) == c(3) && c(1) == c(2) && c(0) != c(1)
+    }).exists(x => x)
+
+  private def isExtABBA(): Boolean = ext.exists(isABBA)
+
+  private def isIntABBA(): Boolean = int.exists(isABBA)
+
+  def isTLS(): Boolean = isExtABBA && !isIntABBA
+
+  private def getABA(s: String): List[String] =
+  s.sliding(3).filter(ss => {
+    val c = ss.toSeq
+    c(0) == c(2) && c(0) != c(1)
+  }).toList
+
+  private def matchingABA(s1: String, s2: String): Boolean = {
+    val c1 = s1.toSeq
+    val c2 = s2.toSeq
+    c1.length == 3 && c2.length == 3 &&
+      c1(0) == c1(2) && c1(0) == c2(1) &&
+      c2(0) == c2(2) && c2(0) == c1(1)
+  }
+
+  def isSSL(): Boolean = {
+    val extABA = ext.flatMap(getABA)
+    val intABA = int.flatMap(getABA)
+    (for (e <- extABA; i <- intABA) yield (e, i)).exists(p => matchingABA(p._1, p._2))
+  }
+}
 
 println("--- test isTLS ---")
 val test = List(
