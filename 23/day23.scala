@@ -5,12 +5,64 @@ sealed trait Expression
 case class Register(name: String) extends Expression
 case class Literal(i: Int) extends Expression
 
-sealed trait Instruction
-case class Copy(e1: Expression, e2: Expression) extends Instruction
-case class Inc(e: Expression) extends Instruction
-case class Dec(e: Expression) extends Instruction
-case class Jump(e1: Expression, e2: Expression) extends Instruction
-case class Toggle(e: Expression) extends Instruction
+sealed trait Instruction {
+  def evaluate(a: AssembunnyProgram): Unit
+  def toggle(): Instruction
+}
+case class Copy(e1: Expression, e2: Expression) extends Instruction {
+  def evaluate(a: AssembunnyProgram): Unit = {
+    e2 match {
+      case r: Register =>
+        a.setRegister(r.name, a.getValue(e1))
+      case l: Literal =>
+        // invalid copy, do nothing
+    }
+    a.pointer += 1
+  }
+  def toggle(): Instruction = new Jump(e1, e2)
+}
+case class Inc(e: Expression) extends Instruction {
+  def evaluate(a: AssembunnyProgram): Unit = {
+    e match {
+      case r: Register =>
+        a.setRegister(r.name, a.getValue(r)+1)
+      case l: Literal =>
+        // invalid inc, do nothing
+    }
+    a.pointer += 1
+  }
+  def toggle(): Instruction = new Dec(e)
+}
+case class Dec(e: Expression) extends Instruction {
+  def evaluate(a: AssembunnyProgram): Unit = {
+    e match {
+      case r: Register =>
+        a.setRegister(r.name, a.getValue(r)-1)
+      case l: Literal =>
+        // invalid dec, do nothing
+    }
+    a.pointer += 1
+  }
+  def toggle(): Instruction = new Inc(e)
+}
+case class Jump(e1: Expression, e2: Expression) extends Instruction {
+  def evaluate(a: AssembunnyProgram): Unit = {
+    if (a.getValue(e1) != 0)
+      a.pointer += a.getValue(e2)
+    else
+      a.pointer += 1
+  }
+  def toggle(): Instruction = new Copy(e1, e2)
+}
+case class Toggle(e: Expression) extends Instruction {
+  def evaluate(a: AssembunnyProgram): Unit = {
+    val i = a.pointer + a.getValue(e)
+    if (i >= 0 && i < a.instructions.length)
+      a.instructions(i) = a.instructions(i).toggle()
+    a.pointer += 1  // no-op
+  }
+  def toggle(): Instruction = new Inc(e)
+}
 
 object AsExpr {
   val number = "(-?[0-9]+)".r
@@ -23,23 +75,33 @@ object AsExpr {
   }
 }
 
-val copy   = s"cpy (\w+) (\w+)".r
-val inc    = s"inc (\w+)".r
-val dec    = s"dec (\w+)".r
-val jump   = s"jnz (\w+) (\w+)".r
+val copy   = s"cpy (.+) (.+)".r
+val inc    = s"inc (.+)".r
+val dec    = s"dec (.+)".r
+val jump   = s"jnz (.+) (.+)".r
+val tgl    = s"tgl (.+)".r
 
-def parse(s: String): Instruction = s match {
-  case copy(AsExpr(e1), AsExpr(e2)) => Copy(e1, e2)
-  case inc(AsExpr(e))               => Inc(e)
-  case dec(AsExpr(e))               => Dec(e)
-  case jump(AsExpr(e1), AsExpr(e2)) => Jump(e1, e2)
+def parse(s: String): Option[Instruction] = s match {
+  case copy(AsExpr(e1), AsExpr(e2)) => Some(Copy(e1, e2))
+  case inc(AsExpr(e))               => Some(Inc(e))
+  case dec(AsExpr(e))               => Some(Dec(e))
+  case jump(AsExpr(e1), AsExpr(e2)) => Some(Jump(e1, e2))
+  case tgl(AsExpr(e))               => Some(Toggle(e))
+  case _ => {
+    //throw new Exception("invalid instruction")
+    None
+  }
 }
 
-class AssembunnyProgram(instructions: List[Instruction]) {
+def compile(s: List[String], debug: Int = 0): AssembunnyProgram = {
+  val instructions = s.flatMap(parse).toArray
+  return new AssembunnyProgram(instructions, debug)
+}
+
+class AssembunnyProgram(val instructions: Array[Instruction], debug: Int = 0) {
   var pointer = 0
   var register = new mutable.HashMap[String, Int]()
   var step = 0
-
   reset()
 
   def reset() = {
@@ -47,48 +109,30 @@ class AssembunnyProgram(instructions: List[Instruction]) {
     pointer = 0
     register("a") = 0
     register("b") = 0
-    register("c") = 1
+    register("c") = 0
     register("d") = 0
   }
 
-  def getValue(v: Expression): Int = {
-    v match {
-      case Register(name) => register(name)
+  def getRegister(name: String): Int = register(name)
+
+  def setRegister(name: String, v: Int) = {
+    register(name) = v
+  }
+
+  def getValue(e: Expression): Int = {
+    e match {
+      case Register(name) => getRegister(name)
       case Literal(n) => n
     }
   }
-}
 
-class AssembunnyComputer {
-  var pointer = 0
-  val register = new mutable.HashMap[String, Int]()
-  var step = 0
-
-
-  def execute(instructions: Seq[Instruction]) = {
-    reset()
+  def execute() = {
     while (pointer < instructions.length) {
       val inst = instructions(pointer)
-      inst match {
-        case Copy(value, reg) =>
-          register(reg.name) = getValue(value)
-          pointer += 1
-        case Inc(reg) =>
-          register(reg.name) += 1
-          pointer += 1
-        case Dec(reg) =>
-          register(reg.name) -= 1
-          pointer += 1
-        case Jump(value, num) =>
-          if (getValue(value) != 0)
-            pointer += num
-          else
-            pointer += 1
-      }
+      inst.evaluate(this)
       step += 1
-      if ( step % 10000 == 0 ) printState()
+      if ( debug > 0 && (step % debug) == 0 ) printState()
     }
-    printState()
   }
 
   def printState() = {
@@ -97,20 +141,37 @@ class AssembunnyComputer {
 }
 
 
-val test = List(
-  "cpy 41 a",
-  "inc a",
-  "inc a",
+val test = compile(List(
+  "cpy 2 a",
+  "tgl a",
+  "tgl a",
+  "tgl a",
+  "cpy 1 a",
   "dec a",
-  "jnz a 2",
   "dec a"
-).map(parse)
+), debug=1)
 
-//val input = Source.fromFile("input.txt").getLines.toList.map(parse)
 
-val c = new AssembunnyComputer()
-println("### test ###")
-c.execute(test)
+
+println("--- test ---")
+test.execute()
 println()
+
+println("--- input (part 1) ---")
+val input = compile(Source.fromFile("input.txt").getLines.toList, debug=10000)
+input.setRegister("a", 7)
+input.execute()
+input.printState()
+println(s"out = ${input.getRegister("a")}")
+println()
+
+println("--- input (part 2) ---")
+val input2 = compile(Source.fromFile("input.txt").getLines.toList, debug=10000)
+input2.setRegister("a", 12)
+input2.execute()
+input2.printState()
+println(s"out = ${input2.getRegister("a")}")
+
+
 //println("### input ###")
 //c.execute(input)
