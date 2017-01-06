@@ -26,6 +26,9 @@ case class Elf(id: Integer) {
     else
       getCircle(circle.head.getPrev :: circle)
   }
+
+  def getCircleString: String =
+    getCircle.map(_.id).mkString("-")
 }
 
 object Elf {
@@ -55,13 +58,17 @@ def solve(n: Int): Elf = {
   start
 }
 
-def solve2(n: Int): Elf = {
+def solve2(n: Int, debug: Int = 1000, debugCircle: Boolean = false): Elf = {
   val elves = Elf.buildCircle(n)
 
   var start = elves.head
   var mid   = elves(n/2)
   for (i <- 0 until n-1) {
-    if (i % 1000 == 0) println(s"step $i: $start <- $mid")
+    if (i % debug == 0) {
+      print(s"${start.id} <- ${mid.id}")
+      if (debugCircle) print(s" (${start.getCircleString})")
+      println()
+    }
     mid.delete()
     mid = mid.getNext
     if ((n-i)%2 == 1) mid = mid.getNext
@@ -75,12 +82,12 @@ println(solve(5))
 println()
 
 println("--- test part #2 ---")
-println(solve2(5))
+println(solve2(5, 1, true))
 println()
 
 val input = 3004953
-println("--- part #1 ---")
-println(solve(input))
+//println("--- part #1 ---")
+//println(solve(input))
 
-println("--- part #2 ---")
-println(solve2(input))
+//println("--- part #2 ---")
+//println(solve2(input))
